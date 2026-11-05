@@ -204,7 +204,7 @@ jobs:
   openbsd:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 40
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -222,4 +222,8 @@ jobs:
           copyback: false
           run: |
             cd pkg
-            sh .github/ipv6-test.sh
+            rc=0
+            sh .github/ipv6-test.sh </dev/null >ipv6-test.out 2>&1 || rc=$?
+            cat ipv6-test.out
+            ps -axww | cut -c1-120
+            exit "$rc"
