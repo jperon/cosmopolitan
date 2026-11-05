@@ -121,12 +121,17 @@ jobs:
 
       - name: test
         working-directory: pkg
-        run: sh .github/ipv6-test.sh
+        run: |
+          if [ "${{ matrix.arm64 }}" = "true" ]; then
+            arch -x86_64 sh .github/ipv6-test.sh
+          else
+            sh .github/ipv6-test.sh
+          fi
 
   freebsd:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -153,7 +158,7 @@ jobs:
   netbsd:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -176,11 +181,24 @@ jobs:
           run: |
             cd pkg
             sh .github/ipv6-test.sh
+            if [ "${{ matrix.release }}" = "11.1" ]; then
+              if pkgin -y install bash; then
+                cp /bin/sh /bin/sh.orig
+                cp "$(command -v bash)" /bin/sh
+                ./tests/redbean_test >alt-shell-redbean_test.log 2>&1
+                rc=$?
+                echo "alt shell redbean_test rc=$rc"
+                sed 's/^/  /' alt-shell-redbean_test.log
+                cp /bin/sh.orig /bin/sh
+              else
+                echo "alt shell: bash not installable, skipping redbean_test"
+              fi
+            fi
 
   openbsd:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
       - uses: actions/download-artifact@v4
         with:

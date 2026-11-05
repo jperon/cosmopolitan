@@ -34,7 +34,7 @@ if (-not (Test-Path redbean.exe)) {
 }
 
 New-Item -ItemType Directory -Force site | Out-Null
-Set-Content -NoNewline site\ip.lua 'Write(FormatIp((GetRemoteAddr())).." host="..tostring(GetHost()).."\n")'
+Set-Content -NoNewline -LiteralPath site\ip.lua -Value 'Write(FormatIp((GetRemoteAddr())).." host="..tostring(GetHost()).."\n")'
 
 # Never kill these servers: killing one redbean may take down the whole
 # process group.  They are left running until this script exits.
