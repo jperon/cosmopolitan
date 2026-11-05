@@ -183,13 +183,19 @@ jobs:
             sh .github/ipv6-test.sh
             if [ "${{ matrix.release }}" = "11.1" ]; then
               if /usr/sbin/pkg_add -u bash; then
-                cp /bin/sh /bin/sh.orig
-                cp "$(command -v bash)" /bin/sh
-                ./tests/redbean_test >alt-shell-redbean_test.log 2>&1
-                rc=$?
-                echo "alt shell redbean_test rc=$rc"
-                sed 's/^/  /' alt-shell-redbean_test.log
-                cp /bin/sh.orig /bin/sh
+                if [ "$(id -u)" != "0" ]; then
+                  echo "alt shell: not root (uid $(id -u)), continuing"
+                fi
+                if mv /bin/sh /bin/sh.orig; then
+                  cp "$(command -v bash)" /bin/sh || true
+                  rc=0
+                  ./ape.elf ./tests/redbean_test >alt-shell-redbean_test.log 2>&1 || rc=$?
+                  echo "alt shell redbean_test rc=$rc"
+                  sed 's/^/  /' alt-shell-redbean_test.log || true
+                  mv /bin/sh.orig /bin/sh || true
+                else
+                  echo "alt shell: could not move /bin/sh, skipping redbean_test"
+                fi
               else
                 echo "alt shell: bash not installable, skipping redbean_test"
               fi

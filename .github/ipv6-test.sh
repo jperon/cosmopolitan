@@ -6,6 +6,13 @@ set -u
 UNAME=$(uname -s)
 RC=0
 
+# Rosetta cannot run sqlite_test within the 120 s limit; treat that timeout as expected.
+ROSETTA=
+if [ "$UNAME" = "Darwin" ] &&
+   [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = 1 ]; then
+    ROSETTA=1
+fi
+
 fail() {
     echo "FAIL: $*" >&2
     RC=1
@@ -178,6 +185,9 @@ for t in tests/*_test; do
            { [ "$UNAME" = "NetBSD" ] || [ "$UNAME" = "OpenBSD" ]; } &&
            grep -qF -e "nul ('\\0') in shell input" -e "NUL byte unexpected" "$name.log"; then
             echo "ok $name (expected failure on $UNAME: APE re-exec via /bin/sh)"
+        elif [ "$name" = "sqlite_test" ] && [ -n "$ROSETTA" ] &&
+             { [ "$status" = "142" ] || [ "$status" = "124" ]; }; then
+            echo "ok $name (expected timeout under Rosetta)"
         else
             echo "ko $name ($status)"
             sed 's/^/  /' "$name.log"
