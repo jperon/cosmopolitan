@@ -1,0 +1,201 @@
+name: ipv6-tests
+
+env:
+  COSMOCC_VERSION: 3.9.2
+
+on:
+  push:
+    branches:
+      - "ipv6"
+      - "ipv6-tests"
+
+  # run workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: support ape bins 1
+        run: sudo cp -a build/bootstrap/ape.elf /usr/bin/ape
+
+      - name: support ape bins 2
+        run: sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
+
+      - name: make
+        run: make -j4 m= o//tool/net/redbean o//test/net/http o//test/net/https o//test/tool/net
+
+      - name: assemble package
+        run: |
+          mkdir -p pkg/tests pkg/lua pkg/.github
+          cp o/tool/net/redbean pkg/redbean
+          cp o/ape/ape.elf pkg/ape.elf
+          cp .github/ipv6-test.sh .github/ipv6-test.ps1 pkg/.github/
+          for d in o/test/net/http o/test/net/https o/test/tool/net; do
+            for f in "$d"/*_test; do
+              [ -f "$f" ] || continue
+              cp "$f" pkg/tests/
+            done
+          done
+          cp test/tool/net/*.lua pkg/lua/
+          tar -C pkg -czf pkg.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipv6-tests
+          path: pkg.tar.gz
+          retention-days: 7
+
+  linux:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: support ape bins 1
+        run: sudo cp -a pkg/ape.elf /usr/bin/ape
+
+      - name: support ape bins 2
+        run: sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
+
+      - name: test
+        working-directory: pkg
+        run: sh .github/ipv6-test.sh
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        shell: bash
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: test
+        working-directory: pkg
+        run: pwsh .github/ipv6-test.ps1
+
+  macos:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.arm64 }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arm64: false
+          - os: macos-15
+            arm64: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: install rosetta
+        if: matrix.arm64
+        run: sudo softwareupdate --install-rosetta --agree-to-license
+
+      - name: test
+        working-directory: pkg
+        run: sh .github/ipv6-test.sh
+
+  freebsd:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["15.1", "13.5"]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          copyback: false
+          run: |
+            cd pkg
+            sh .github/ipv6-test.sh
+
+  netbsd:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["11.1", "9.5"]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: test in NetBSD
+        uses: vmactions/netbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          copyback: false
+          run: |
+            cd pkg
+            sh .github/ipv6-test.sh
+
+  openbsd:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipv6-tests
+          path: artifact
+
+      - name: extract
+        run: mkdir -p pkg && tar -xzf artifact/pkg.tar.gz -C pkg
+
+      - name: test in OpenBSD
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: "7.3"
+          usesh: true
+          copyback: false
+          run: |
+            cd pkg
+            sh .github/ipv6-test.sh
