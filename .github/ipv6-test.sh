@@ -97,8 +97,9 @@ cat >site/ip.lua <<'LUA'
 Write(FormatIp((GetRemoteAddr())).." host="..tostring(GetHost()).."\n")
 LUA
 
-# Never kill these servers: killing one redbean may take down the whole
-# process group.  They are left running until this script exits.
+# Do not kill these servers with a polite signal while testing: killing one
+# redbean may take down the whole process group.  They are left running until
+# this script exits, then SIGKILLed (see below).
 run_ape ./redbean -D site -p 18801 -l ::1 -l 127.0.0.1 -L l1 </dev/null >l1.out 2>&1 &
 run_ape ./redbean -D site -p 18803 -l 0.0.0.0 -l :: -L l3 </dev/null >l3.out 2>&1 &
 run_ape ./redbean -D site -p 18804 -L l4 </dev/null >l4.out 2>&1 &
@@ -225,4 +226,6 @@ if [ "$RC" -eq 0 ]; then
 else
     echo "FAIL"
 fi
+# SIGKILL leaves redbean no chance to relay the signal to its group.
+pkill -9 -f redbean 2>/dev/null || true
 exit "$RC"
