@@ -55,13 +55,14 @@ $code = & curl.exe -s -o NUL -w '%{http_code}' --max-time 10 'http://[::1]:18804
 if ($LASTEXITCODE -eq 0) { Fail "[::1]:18804 unexpectedly succeeded (status $code)" }
 
 $ll = Get-NetIPAddress -AddressFamily IPv6 -ErrorAction SilentlyContinue |
-    Where-Object { $_.IPAddress -eq 'fe80::1' -and $_.InterfaceAlias -like 'Loopback*' } |
+    Where-Object { $_.IPAddress -like 'fe80*' -and $_.InterfaceAlias -notlike 'Loopback*' } |
     Select-Object -First 1
 if ($ll) {
+    $ip = $ll.IPAddress -replace '%.*$', ''
     $z = $ll.InterfaceIndex
-    StartServer @('-D', 'site', '-p', '18806', '-l', "fe80::1%$z", '-L', 'l5.txt') 'l5' | Out-Null
+    StartServer @('-D', 'site', '-p', '18806', '-l', "$ip%$z", '-L', 'l5.txt') 'l5' | Out-Null
     Start-Sleep -Seconds 1
-    CurlCheck "http://[$($ll.IPAddress)%25$z]:18806/ip.lua" 'fe80::1'
+    CurlCheck "http://[$ip%25$z]:18806/ip.lua" $ip
     if (Test-Path l5.txt) {
         if (Select-String -Path l5.txt -Pattern 'listen' -Quiet) {
             Write-Host "ok fe80 listen"
@@ -72,7 +73,7 @@ if ($ll) {
         Fail "no fe80 log"
     }
 } else {
-    Write-Host "skip: no fe80::1 loopback address"
+    Write-Host "skip: no fe80 link-local address"
 }
 
 foreach ($log in @('l1.txt', 'l3.txt', 'l4.txt')) {

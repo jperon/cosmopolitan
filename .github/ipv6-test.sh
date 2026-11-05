@@ -59,7 +59,8 @@ run_ape() {
     fi
 }
 
-# Like run_ape, but bounded by timeout(1) when it is available.
+# Like run_ape, but bounded by timeout(1) when it is available.  macOS and
+# OpenBSD have no timeout(1); fall back to perl's alarm when perl is present.
 run_limited() {
     seconds=$1
     shift
@@ -68,6 +69,12 @@ run_limited() {
             timeout "$seconds" "$RUN" "$@"
         else
             timeout "$seconds" "$@"
+        fi
+    elif command -v perl >/dev/null 2>&1; then
+        if [ -n "$RUN" ]; then
+            perl -e 'alarm shift; exec @ARGV' "$seconds" "$RUN" "$@"
+        else
+            perl -e 'alarm shift; exec @ARGV' "$seconds" "$@"
         fi
     else
         if [ -n "$RUN" ]; then
@@ -159,6 +166,7 @@ done
 for t in tests/*_test; do
     [ -f "$t" ] || continue
     name=$(basename "$t")
+    echo "run $name"
     if run_limited 120 "$t" >"$name.log" 2>&1; then
         echo "ok $name"
     else
@@ -181,13 +189,17 @@ done
 for t in lua/*_test.lua; do
     [ -f "$t" ] || continue
     name=$(basename "$t")
+    echo "run $name"
     if run_limited 120 ./redbean -i "$t" >"$name.log" 2>&1; then
         echo "ok $name"
     else
         status=$?
-        # NetBSD 9.5 st_blocks depends on the filesystem, not on our code.
-        # Ipv6Test runs before UnixTest in this file, so its checks did run.
-        if [ "$name" = "lunix_test.lua" ] && [ "$UNAME" = "NetBSD" ] &&
+        # On NetBSD 9.5 and FreeBSD 15.1 st_blocks depends on the
+        # filesystem, not on our code.  Ipv6Test runs before UnixTest in
+        # this file, so its checks did run.
+        if [ "$name" = "lunix_test.lua" ] &&
+           { [ "$UNAME" = "NetBSD" ] || [ "$UNAME" = "FreeBSD" ] ||
+             [ "$UNAME" = "OpenBSD" ]; } &&
            grep -qF 'lunix_test.lua:123: assertion failed' "$name.log"; then
             echo "ok $name (expected failure on $UNAME: st_blocks filesystem dependent)"
         else

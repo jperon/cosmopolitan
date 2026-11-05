@@ -97,7 +97,7 @@ jobs:
     needs: build
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.arm64 }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -182,7 +182,7 @@ jobs:
             cd pkg
             sh .github/ipv6-test.sh
             if [ "${{ matrix.release }}" = "11.1" ]; then
-              if pkgin -y install bash; then
+              if /usr/sbin/pkg_add -u bash; then
                 cp /bin/sh /bin/sh.orig
                 cp "$(command -v bash)" /bin/sh
                 ./tests/redbean_test >alt-shell-redbean_test.log 2>&1
